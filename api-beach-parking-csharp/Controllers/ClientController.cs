@@ -11,19 +11,21 @@ namespace api_beach_parking_csharp.Controllers
     [ApiController]
     public class ClientController : ControllerBase
     {
-        private readonly ILogger<ClientController> _logger; 
+        private readonly ILogger<ClientController> _logger;
+        private readonly ApplicationDbContext _db;
 
-        public ClientController(ILogger<ClientController> logger) 
+        public ClientController(ILogger<ClientController> logger, ApplicationDbContext db) 
         { 
             _logger = logger;
+            _db = db;
         }
 
         [HttpGet(Name="GetClients")]
         [ProducesResponseType(StatusCodes.Status200OK)]
         public ActionResult<IEnumerable<ClientDto>> GetClients()
         {
-            _logger.LogInformation("All client have been loaded");
-            return Ok(ClientStore.clients);
+            _logger.LogInformation("All clients have been loaded");
+            return Ok(_db.clients.ToList());
         }
 
         [HttpGet("id:int", Name = "GetClientById")]
@@ -37,7 +39,8 @@ namespace api_beach_parking_csharp.Controllers
                 _logger.LogError("Error when you try load this client " + id);
                 return BadRequest();
             }
-            var client = ClientStore.clients.FirstOrDefault(v => v.id == id);
+            //var client = ClientStore.clients.FirstOrDefault(v => v.id == id);
+            var client = _db.clients.FirstOrDefault(v => v.id == id);
 
             if(client == null)
             {
@@ -68,9 +71,18 @@ namespace api_beach_parking_csharp.Controllers
                 return StatusCode(StatusCodes.Status500InternalServerError);
             
             }
+            Client client = new()
+            {
+                id = clientDto.id,
+                first_name = clientDto.first_name,
+                last_name = clientDto.last_name,
+                email = clientDto.email,
+                phone = clientDto.phone,
+                status = clientDto.status,
+            };
 
-            clientDto.id = ClientStore.clients.OrderByDescending(v => v.id).FirstOrDefault().id + 1;
-            ClientStore.clients.Add(clientDto);
+            _db.clients.Add(client);
+            _db.SaveChanges();
 
             return CreatedAtRoute("GetClientById", new { id=clientDto.id, clientDto});
 
@@ -85,12 +97,19 @@ namespace api_beach_parking_csharp.Controllers
             {
                 return BadRequest();
             }
-            var client = ClientStore.clients.FirstOrDefault(c => c.id == id);
-            client.first_name = clientDto.first_name;
-            client.last_name = clientDto.last_name;
-            client.email = clientDto.email;
-            client.phone = clientDto.phone;
-            client.status = clientDto.status;
+
+            Client client = new()
+            {
+                id = clientDto.id,
+                first_name = clientDto.first_name,
+                last_name = clientDto.last_name,
+                email = clientDto.email,
+                phone = clientDto.phone,
+                status = clientDto.status,
+            };
+
+            _db.clients.Update(client);
+            _db.SaveChanges();
 
             return NoContent();
         }
@@ -105,13 +124,41 @@ namespace api_beach_parking_csharp.Controllers
                 return BadRequest();
             }
 
-            var client = ClientStore.clients.FirstOrDefault(c => c.id == id);
-            patchDto.ApplyTo(client, ModelState);
+            var client = _db.clients.FirstOrDefault(v => v.id == id);
 
-            if(!ModelState.IsValid)
+            ClientDto clientDto = new()
             {
-                return BadRequest(ModelState);   
+                id = client.id,
+                first_name = client.first_name,
+                last_name = client.last_name,
+                email = client.email,
+                phone = client.phone,
+                status = client.status,
+            };
+
+            if (client == null)
+            {
+                return BadRequest();
             }
+
+            patchDto.ApplyTo(clientDto, ModelState);
+
+            if (!ModelState.IsValid)
+            {
+                return BadRequest(ModelState);
+            }
+
+            Client model = new()
+            {
+                id = clientDto.id,
+                first_name = clientDto.first_name,
+                last_name = clientDto.last_name,
+                email = clientDto.email,
+                phone = clientDto.phone,
+                status = clientDto.status,
+            };
+            _db.clients.Update(model);
+            _db.SaveChanges();
 
             return NoContent();
         }
@@ -127,14 +174,15 @@ namespace api_beach_parking_csharp.Controllers
                 return BadRequest(); 
             }
 
-            var client = ClientStore.clients.FirstOrDefault(c => c.id == id);
+            var client = _db.clients.FirstOrDefault(c => c.id == id);
 
             if(client == null)
             {
                 return NotFound();
             }
 
-            ClientStore.clients.Remove(client);
+            _db.clients.Remove(client);
+            _db.SaveChanges();
 
             return NoContent();
         }

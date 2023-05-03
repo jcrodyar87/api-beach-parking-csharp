@@ -1,6 +1,8 @@
 ﻿using api_beach_parking_csharp.Datos;
+using api_beach_parking_csharp.Models;
 using api_beach_parking_csharp.Models.Dto;
 using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.JsonPatch;
 using Microsoft.AspNetCore.Mvc;
 
 namespace api_beach_parking_csharp.Controllers
@@ -9,11 +11,21 @@ namespace api_beach_parking_csharp.Controllers
     [ApiController]
     public class CarController : ControllerBase
     {
+        private readonly ILogger<ClientController> _logger;
+        private readonly ApplicationDbContext _db;
+
+        public CarController(ILogger<ClientController> logger, ApplicationDbContext db)
+        {
+            _logger = logger;
+            _db = db;
+        }
+
         [HttpGet(Name = "GetCars")]
         [ProducesResponseType(StatusCodes.Status200OK)]
         public ActionResult<IEnumerable<CarDto>> GetCars()
         {
-            return Ok(CarStore.cars);
+            _logger.LogInformation("All cars have been loaded");
+            return Ok(_db.cars.ToList());
         }
 
         [HttpGet("id:int", Name = "GetCarById")]
@@ -26,7 +38,7 @@ namespace api_beach_parking_csharp.Controllers
             {
                 return BadRequest();
             }
-            var car = CarStore.cars.FirstOrDefault(v => v.id == id);
+            var car = _db.cars.FirstOrDefault(v => v.id == id);
 
             if (car == null)
             {
@@ -47,7 +59,7 @@ namespace api_beach_parking_csharp.Controllers
                 return BadRequest(ModelState);
             }
 
-            if(CarStore.cars.FirstOrDefault(v=>v.code.ToLower() == carDto.code.ToLower()) != null)
+            if(_db.cars.FirstOrDefault(v=>v.code.ToLower() == carDto.code.ToLower()) != null)
             {
                 ModelState.AddModelError("CodigoExiste", "Este código de auto ya ha sido usado");
                 return BadRequest(ModelState);
@@ -64,11 +76,102 @@ namespace api_beach_parking_csharp.Controllers
 
             }
 
-            carDto.id = CarStore.cars.OrderByDescending(v => v.id).FirstOrDefault().id + 1;
-            CarStore.cars.Add(carDto);
+            Car car = new()
+            {
+                id = carDto.id,
+                code = carDto.code,
+                name = carDto.name,
+                model = carDto.model,
+                color = carDto.color,
+                seats_quantity = carDto.seats_quantity,
+                status = carDto.status,
+            };
+
+            _db.cars.Add(car);
+            _db.SaveChanges();
 
             return CreatedAtRoute("GetCarById", new { id = carDto.id, carDto });
 
+        }
+
+        [HttpPut("{id:int}")]
+        [ProducesResponseType(StatusCodes.Status204NoContent)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        public IActionResult UpdateCar(int id, [FromBody] CarDto carDto)
+        {
+            if (carDto == null || id != carDto.id)
+            {
+                return BadRequest();
+            }
+
+            Car car = new()
+            {
+                id = carDto.id,
+                code = carDto.code,
+                name = carDto.name,
+                model = carDto.model,
+                color = carDto.color,
+                seats_quantity = carDto.seats_quantity,
+                status = carDto.status,
+            };
+
+
+            _db.cars.Update(car);
+            _db.SaveChanges();
+
+            return NoContent();
+        }
+
+        [HttpPatch("{id:int}")]
+        [ProducesResponseType(StatusCodes.Status204NoContent)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        public IActionResult UpdatePartialCar(int id, JsonPatchDocument<CarDto> patchDto)
+        {
+            if (patchDto == null || id == 0)
+            {
+                return BadRequest();
+            }
+
+            var car = _db.cars.FirstOrDefault(c => c.id == id);
+
+            CarDto carDto = new()
+            {
+                id = car.id,
+                code = car.code,
+                name = car.name,
+                model = car.model,
+                color = car.color,
+                seats_quantity = car.seats_quantity,
+                status = car.status,
+            };
+
+            if (car == null)
+            {
+                return BadRequest();
+            }
+
+            patchDto.ApplyTo(carDto, ModelState);
+
+            if (!ModelState.IsValid)
+            {
+                return BadRequest(ModelState);
+            }
+
+            Car model = new()
+            {
+                id = carDto.id,
+                code = carDto.code,
+                name = carDto.name,
+                model = carDto.model,
+                color = carDto.color,
+                seats_quantity = carDto.seats_quantity,
+                status = carDto.status,
+            };
+
+            _db.cars.Update(model);
+            _db.SaveChanges();
+
+            return NoContent();
         }
 
         [HttpDelete("{id:int}", Name = "DeleteCar")]
@@ -82,14 +185,16 @@ namespace api_beach_parking_csharp.Controllers
                 return BadRequest();
             }
 
-            var car = CarStore.cars.FirstOrDefault(c => c.id == id);
+            var car = _db.cars.FirstOrDefault(c => c.id == id);
 
             if (car == null)
             {
                 return NotFound();
             }
 
-            CarStore.cars.Remove(car);
+            _db.cars.Remove(car);
+            _db.SaveChanges();
+
 
             return NoContent();
         }
