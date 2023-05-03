@@ -1,7 +1,12 @@
-﻿namespace api_beach_parking_csharp.Models
+﻿using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations.Schema;
+
+namespace api_beach_parking_csharp.Models
 {
     public class Client
     {
+        [Key]
+        [DatabaseGenerated(DatabaseGeneratedOption.Identity)]
         public int id { get; set; }
         public string last_name { get; set; }
         public string first_name { get; set; }
